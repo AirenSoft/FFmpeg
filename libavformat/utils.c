@@ -40,6 +40,8 @@
 #include "libavcodec/internal.h"
 #include "libavcodec/raw.h"
 
+#include "libavformat/rtsp.h"
+
 #include "audiointerleave.h"
 #include "avformat.h"
 #include "avio_internal.h"
@@ -1718,6 +1720,24 @@ int av_read_frame(AVFormatContext *s, AVPacket *pkt)
     int eof = 0;
     int ret;
     AVStream *st;
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // @soulk
+    // Non-blocking options
+    //  - (AVFormatContext *)->flags |= AVFMT_FLAG_NONBLOCK;
+    ////////////////////////////////////////////////////////////////////////////////
+    if(s->flags & AVFMT_FLAG_NONBLOCK)
+    {
+        int fd = av_get_iformat_file_descriptor(s);
+        if(fd >= 0)
+        {
+            struct pollfd p = { .fd =  av_get_iformat_file_descriptor(s), .events = POLLIN | POLLPRI, .revents = 0 };
+            int retval  = poll(&p, 1, 0);
+            if(retval == 0)
+                return AVERROR(EAGAIN);   
+        }
+    }
+    ////////////////////////////////////////////////////////////////////////////////
 
     if (!genpts) {
         ret = s->internal->packet_buffer
@@ -5604,4 +5624,51 @@ FF_ENABLE_DEPRECATION_WARNINGS
 #else
     return st->internal->avctx->time_base;
 #endif
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// @soulk
+//  get file(or socket) description from input format context
+// @return
+//      > 0 : Valid description
+//      -1 : Invalid or not found 
+////////////////////////////////////////////////////////////////////////////////
+int av_get_iformat_file_descriptor(AVFormatContext *s)
+{
+    if(s == NULL || s->iformat == NULL || s->iformat->name == NULL)
+    {
+        return -1;
+    }
+
+    if(strcmp(s->iformat->name, "rtsp") == 0)
+    {
+        // @reference /avformat/tcp.c
+        typedef struct TCPContext {
+            const AVClass *class;
+            int fd;
+            int listen;
+            int open_timeout;
+            int rw_timeout;
+            int listen_timeout;
+            int recv_buffer_size;
+            int send_buffer_size;
+        } TCPContext;
+
+        RTSPState *rtsp_ctx = s->priv_data;
+        if(!rtsp_ctx)
+            return -1;
+
+        URLContext *url_ctx = rtsp_ctx->rtsp_hd;
+        if(!url_ctx)
+            return -1;
+
+        TCPContext *tcp_ctx = url_ctx->priv_data; 
+        if(!tcp_ctx)
+            return -1;
+
+        return tcp_ctx->fd;       
+    }
+    
+    return -1;
 }
