@@ -1634,6 +1634,25 @@ FF_ENABLE_DEPRECATION_WARNINGS
             }
             got_packet = 0;
         }
+
+
+
+#if 1
+        ////////////////////////////////////////////////////////////////////////////////
+        // @soulk
+        // for Non-blocking options
+        //  - (AVFormatContext *)->flags |= AVFMT_FLAG_NONBLOCK;
+        ////////////////////////////////////////////////////////////////////////////////
+        if(s->flags & AVFMT_FLAG_NONBLOCK)
+        {
+            if(!(!got_packet && !s->internal->parse_queue))
+            {
+                break;
+            }
+
+            return AVERROR(EAGAIN);
+        }
+#endif        
     }
 
     if (!got_packet && s->internal->parse_queue)
