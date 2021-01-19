@@ -39,6 +39,8 @@
 #include "libavcodec/internal.h"
 #include "libavcodec/raw.h"
 
+#include "libavformat/rtsp.h"
+
 #include "avformat.h"
 #include "avio_internal.h"
 #include "id3v2.h"
@@ -1692,7 +1694,26 @@ FF_ENABLE_DEPRECATION_WARNINGS
             av_packet_unref(pkt);
             got_packet = 0;
         }
+
+#if 1
+        ////////////////////////////////////////////////////////////////////////////////
+        // @soulk
+        // for Non-blocking options
+        //  - (AVFormatContext *)->flags |= AVFMT_FLAG_NONBLOCK;
+        ////////////////////////////////////////////////////////////////////////////////
+        if(s->flags & AVFMT_FLAG_NONBLOCK)
+        {
+            if(!(!got_packet && !s->internal->parse_queue))
+            {
+                break;
+            }
+
+            return AVERROR(EAGAIN);
+        }
+#endif          
     }
+
+
 
     if (!got_packet && s->internal->parse_queue)
         ret = ff_packet_list_get(&s->internal->parse_queue, &s->internal->parse_queue_end, pkt);
@@ -1776,6 +1797,24 @@ int av_read_frame(AVFormatContext *s, AVPacket *pkt)
     int eof = 0;
     int ret;
     AVStream *st;
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // @soulk
+    // Non-blocking options
+    //  - (AVFormatContext *)->flags |= AVFMT_FLAG_NONBLOCK;
+    ////////////////////////////////////////////////////////////////////////////////
+    if(s->flags & AVFMT_FLAG_NONBLOCK)
+    {
+        int fd = av_get_iformat_file_descriptor(s);
+        if(fd >= 0)
+        {
+            struct pollfd p = { .fd =  av_get_iformat_file_descriptor(s), .events = POLLIN | POLLPRI, .revents = 0 };
+            int retval  = poll(&p, 1, 0);
+            if(retval == 0)
+                return AVERROR(EAGAIN);   
+        }
+    }
+    
 
     if (!genpts) {
         ret = s->internal->packet_buffer
@@ -5852,4 +5891,48 @@ FF_DISABLE_DEPRECATION_WARNINGS
     av_strlcpy(s->filename, url, sizeof(s->filename));
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// @soulk
+//  get file(or socket) description from input format context
+// @return
+//      > 0 : Valid description
+//      -1 : Invalid or not found 
+////////////////////////////////////////////////////////////////////////////////
+int av_get_iformat_file_descriptor(AVFormatContext *s)
+{
+    if(s == NULL || s->iformat == NULL || s->iformat->name == NULL)
+    {
+        return -1;
+    }
+
+    if(strcmp(s->iformat->name, "rtsp") == 0)
+    {
+        // @reference /avformat/tcp.c
+        typedef struct TCPContext {
+            const AVClass *class;
+            int fd;
+            int listen;
+            int open_timeout;
+            int rw_timeout;
+            int listen_timeout;
+            int recv_buffer_size;
+            int send_buffer_size;
+        } TCPContext;
+
+        RTSPState *rtsp_ctx = s->priv_data;
+        if(!rtsp_ctx)
+            return -1;
+
+        URLContext *h = rtsp_ctx->rtsp_hd;
+        if (!h || !h->prot || !h->prot->url_get_file_handle)
+            return -1;
+
+        return h->prot->url_get_file_handle(h);     
+    }
+    
+    return -1;
 }

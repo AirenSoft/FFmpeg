@@ -3086,8 +3086,17 @@ int avformat_transfer_internal_stream_timing_info(const AVOutputFormat *ofmt,
  */
 AVRational av_stream_get_codec_timebase(const AVStream *st);
 
+
 /**
- * @}
- */
+ * #soulk
+ *
+ * Get file(Socket) descriptor from input format
+ * @param ctx the format context which the stream is part of
+ * @return
+ *      >= 0 valid description;
+ *      -1 Invalid or not found 
+*/
+int av_get_iformat_file_descriptor(AVFormatContext *s);
+
 
 #endif /* AVFORMAT_AVFORMAT_H */
