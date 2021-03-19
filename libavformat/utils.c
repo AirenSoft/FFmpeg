@@ -1695,7 +1695,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
             got_packet = 0;
         }
 
-#if 1
+#if 0
         ////////////////////////////////////////////////////////////////////////////////
         // @soulk
         // for Non-blocking options
@@ -1798,6 +1798,7 @@ int av_read_frame(AVFormatContext *s, AVPacket *pkt)
     int ret;
     AVStream *st;
 
+#if 0
     ////////////////////////////////////////////////////////////////////////////////
     // @soulk
     // Non-blocking options
@@ -1814,7 +1815,7 @@ int av_read_frame(AVFormatContext *s, AVPacket *pkt)
                 return AVERROR(EAGAIN);   
         }
     }
-    
+#endif
 
     if (!genpts) {
         ret = s->internal->packet_buffer
