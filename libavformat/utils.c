@@ -1637,7 +1637,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
 
 
 
-#if 1
+#if 0
         ////////////////////////////////////////////////////////////////////////////////
         // @soulk
         // for Non-blocking options
@@ -1739,24 +1739,6 @@ int av_read_frame(AVFormatContext *s, AVPacket *pkt)
     int eof = 0;
     int ret;
     AVStream *st;
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // @soulk
-    // Non-blocking options
-    //  - (AVFormatContext *)->flags |= AVFMT_FLAG_NONBLOCK;
-    ////////////////////////////////////////////////////////////////////////////////
-    if(s->flags & AVFMT_FLAG_NONBLOCK)
-    {
-        int fd = av_get_iformat_file_descriptor(s);
-        if(fd >= 0)
-        {
-            struct pollfd p = { .fd =  av_get_iformat_file_descriptor(s), .events = POLLIN | POLLPRI, .revents = 0 };
-            int retval  = poll(&p, 1, 0);
-            if(retval == 0)
-                return AVERROR(EAGAIN);   
-        }
-    }
-    ////////////////////////////////////////////////////////////////////////////////
 
     if (!genpts) {
         ret = s->internal->packet_buffer
